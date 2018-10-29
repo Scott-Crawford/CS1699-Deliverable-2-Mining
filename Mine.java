@@ -10,13 +10,15 @@ public class Mine{
     
     public static final BigInteger MAX_TARGET = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
     public static final String STARTER_COINBASE = ";1333dGpHU6gQShR596zbKHXEeSihdtoyLb>";
-    static TreeMap<Integer, TreeMap<Integer, ArrayList<String>>> transactionsByFee;
+    static TreeMap<Double, ArrayList<String>> transactionsByRatio;
+    static HashMap<String, ArrayList<Integer>> transactionSizeAndFee;
     static ArrayList<String> transactionsAdded;
     static int totalEarned;
+    static long timestamp;
     
     public static void main(String[] args) throws Exception{
         
-        long timestamp = Instant.now().toEpochMilli();
+        timestamp = Instant.now().toEpochMilli();
         
         String file = args[0];
         String difficulty = args[1];
@@ -31,7 +33,8 @@ public class Mine{
         
         BufferedReader infile = new BufferedReader(new FileReader(file));
          
-        transactionsByFee = new TreeMap<>();
+        transactionsByRatio = new TreeMap<>();
+        transactionSizeAndFee = new HashMap<>();
         transactionsAdded = new ArrayList<>();
         totalEarned = 50;
         
@@ -40,21 +43,9 @@ public class Mine{
         ArrayList<String> allTransactions = new ArrayList<>();
         while(infile.ready()){
             String transaction = infile.readLine().trim();
-            String[] transactionArray = transaction.split(";");
-            String[] inputs = transactionArray[0].split(",");
-            String[] outputs = transactionArray[1].split(",");
-            int inputTotal = 0;
-            for(int i = 0; i<inputs.length; i++){
-                String[] values = inputs[i].split(">");
-                inputTotal += Integer.parseInt(values[1]);
-            }
-            int outputTotal = 0;
-            for(int i = 0; i<outputs.length; i++){
-                String[] values = outputs[i].split(">");
-                outputTotal += Integer.parseInt(values[1]);
-            }
-            int fee = inputTotal-outputTotal;
-            int size = inputs.length+outputs.length;
+            ArrayList<Integer> feeAndSize = getFeeAndSize(transaction);
+            int fee = feeAndSize.get(0);
+            int size = feeAndSize.get(1);
             insertIntoMap(transaction,fee,size);
             inputsAndOutputs+=size;
             potentialEarnings+=fee;
@@ -100,6 +91,9 @@ public class Mine{
             else{
                 nonce = incrementStringNonce(nonce,counter);
                 counter++;
+                if(counter%108886625==0){
+                    counter=1;
+                }
             }
         }
         
@@ -108,56 +102,37 @@ public class Mine{
     }
     
     private static void insertIntoMap(String transaction, int fee, int size){
-        if(transactionsByFee.containsKey(fee)){
-            TreeMap<Integer, ArrayList<String>> transactionsBySize= transactionsByFee.get(fee);
-            if(transactionsBySize.containsKey(size)){
-                ArrayList<String> transactions = transactionsBySize.get(size);
-                transactions.add(transaction);
-                transactionsBySize.put(size, transactions);
-                transactionsByFee.put(fee, transactionsBySize);
-            }
-            else{
-                ArrayList<String> transactions = new ArrayList<>();
-                transactions.add(transaction);
-                transactionsBySize.put(size, transactions);
-                transactionsByFee.put(fee, transactionsBySize);
-            }
+        double ratio = fee/size;
+        
+        if(transactionsByRatio.containsKey(ratio)){
+            ArrayList<String> transactions = transactionsByRatio.get(ratio);
+            transactions.add(transaction);
+            transactionsByRatio.put(ratio, transactions);
         }
         else{
-            TreeMap<Integer, ArrayList<String>> transactionsBySize = new TreeMap<>();
             ArrayList<String> transactions = new ArrayList<>();
             transactions.add(transaction);
-            transactionsBySize.put(size, transactions);
-            transactionsByFee.put(fee, transactionsBySize);
-            transactionsByFee.put(fee, transactionsBySize);
+            transactionsByRatio.put(ratio, transactions);
         }
     }
     
     private static int findNextBest(int maxSize){
-        TreeSet<Integer> set = new TreeSet<Integer>(transactionsByFee.keySet());
-        for(Integer i:set.descendingSet()){
-            TreeMap<Integer, ArrayList<String>> transactionsBySize = transactionsByFee.get(i);
-            for(Integer j:transactionsBySize.keySet()){
-                if(j<=maxSize){
-                    ArrayList<String> transactions = transactionsBySize.get(j);
-                    String transaction = transactions.get(0);
-                    transactions.remove(0);
+        TreeSet<Double> set = new TreeSet<Double>(transactionsByRatio.keySet());
+        for(Double d:set.descendingSet()){
+            ArrayList<String> transactions = transactionsByRatio.get(d);
+            for(String s: transactions){
+                ArrayList<Integer> feeAndSize = getFeeAndSize(s);
+                if(feeAndSize.get(1)<=maxSize){
+                    transactionsAdded.add(s);
+                    totalEarned+=feeAndSize.get(0);
+                    transactions.remove(s);
                     if(transactions.isEmpty()){
-                        transactionsBySize.remove(j);
-                        if(transactionsBySize.isEmpty()){
-                            transactionsByFee.remove(i);
-                        }
-                        else{
-                            transactionsByFee.put(i, transactionsBySize);
-                        }
+                        transactionsByRatio.remove(d);
                     }
                     else{
-                        transactionsBySize.put(j, transactions);
-                        transactionsByFee.put(i, transactionsBySize);
+                        transactionsByRatio.put(d, transactions);
                     }
-                    transactionsAdded.add(transaction);
-                    totalEarned+=i;
-                    return j;
+                    return feeAndSize.get(1);
                 }
             }
         }
@@ -196,7 +171,8 @@ public class Mine{
         if(counter%857375==0){
             charArray[0]+=1;
             if(charArray[0]%127==0){
-                return "";
+                charArray[0]=32;
+                timestamp+=1;
             }
             charArray[1]=32;
             charArray[2]=32;
@@ -235,12 +211,39 @@ public class Mine{
         System.out.println(prevHash);
         System.out.println(blockSize);
         System.out.println(timestamp);
+        System.out.println(difficulty);
         System.out.println(nonce);
         System.out.println(concatRootHash);
         for(String s: transactions){
             System.out.println(s);
         }
         
+    }
+    
+    private static ArrayList<Integer> getFeeAndSize(String transaction){
+        if(transactionSizeAndFee.containsKey(transaction)){
+            return transactionSizeAndFee.get(transaction);
+        }
+        String[] transactionArray = transaction.split(";");
+        String[] inputs = transactionArray[0].split(",");
+        String[] outputs = transactionArray[1].split(",");
+        int inputTotal = 0;
+        for(int i = 0; i<inputs.length; i++){
+            String[] values = inputs[i].split(">");
+            inputTotal += Integer.parseInt(values[1]);
+        }
+        int outputTotal = 0;
+        for(int i = 0; i<outputs.length; i++){
+            String[] values = outputs[i].split(">");
+            outputTotal += Integer.parseInt(values[1]);
+        }
+        int fee = inputTotal-outputTotal;
+        int size = inputs.length+outputs.length;
+        ArrayList<Integer> list = new ArrayList<>();
+        list.add(fee);
+        list.add(size);
+        transactionSizeAndFee.put(transaction, list);
+        return list;
     }
 
 
