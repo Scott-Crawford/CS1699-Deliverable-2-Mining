@@ -91,7 +91,7 @@ public class Mine{
         String nonce = String.valueOf(new char[]{x,x,x,x});
         String blockHash = "";
         while(true){
-            String block = prevHash+transactionsAdded.size()+timestamp+difficulty+nonce+concatRootHash;
+            String block = prevHash+blockSize+timestamp+difficulty+nonce+concatRootHash;
             blockHash = calculateHash(block);
             BigInteger blockHashHex = new BigInteger(blockHash, 16);
             if(blockHashHex.compareTo(target) == -1){
