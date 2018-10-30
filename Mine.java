@@ -8,13 +8,13 @@ import java.security.NoSuchAlgorithmException;
 
 public class Mine{
     
-    public static final BigInteger MAX_TARGET = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
-    public static final String STARTER_COINBASE = ";1333dGpHU6gQShR596zbKHXEeSihdtoyLb>";
-    static TreeMap<Double, ArrayList<String>> transactionsByRatio;
-    static HashMap<String, ArrayList<Integer>> transactionSizeAndFee;
-    static ArrayList<String> transactionsAdded;
-    static int totalEarned;
-    static long timestamp;
+    private static final BigInteger MAX_TARGET = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
+    private static final String STARTER_COINBASE = ";1333dGpHU6gQShR596zbKHXEeSihdtoyLb>";
+    private static TreeMap<Double, ArrayList<String>> transactionsByRatio;
+    private static HashMap<String, ArrayList<Integer>> transactionSizeAndFee;
+    private static ArrayList<String> transactionsAdded;
+    private static int totalEarned;
+    private static long timestamp;
     
     public static void main(String[] args) throws Exception{
         
